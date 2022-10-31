@@ -1,42 +1,47 @@
 package main
 
 import (
-	"codeforces/boot"
-	"codeforces/crawl"
-	"fmt"
 	"time"
+
+	"codeforces/handle"
+	"codeforces/utils"
 )
 
-func handle() {
-	submissions, err := crawl.QuerySubmission(0)
-	//fmt.Println(crawl.QueryContest("102992"))
-	if err != nil || len(submissions) == 0 {
-		fmt.Println(err, len(submissions))
-		panic("err")
+var process handle.Process
+
+func Start() {
+	for _, broadcast := range process.Broadcasts {
+		time.Sleep(time.Second * 5)
+		process.InitBroadcast(broadcast)
 	}
-	preSubmissionID := submissions[0].ID
-	fmt.Println(preSubmissionID)
 
-	submissionChan := make(chan crawl.SubmissionInfo, 10)
+	go process.ProcessMessage()
 
-	go func() {
-		for {
-			submission := <-submissionChan
-			errSend := boot.SendGroupMsg("770539963", submission.Verdict+submission.ContestName+submission.ProblemName)
-			fmt.Println(errSend, submission.Verdict+submission.ContestName+submission.ProblemName)
-		}
-	}()
-
-	for range time.Tick(5 * time.Second) {
-		submissions, err = crawl.QuerySubmission(preSubmissionID)
-		for i := len(submissions) - 1; i >= 0; i-- {
-			submissionChan <- submissions[i]
-			preSubmissionID = submissions[i].ID
+	for range time.Tick(15 * time.Second) {
+		for _, broadcast := range process.Broadcasts {
+			messages := process.Refresh(broadcast)
+			for _, message := range messages {
+				process.MessageChan <- message
+			}
+			time.Sleep(time.Second * 5)
 		}
 	}
 }
 
 func main() {
-	//handle
-	handle()
+	process = handle.Process{
+		Broadcasts:  make([]handle.Broadcast, 0),
+		MessageChan: make(chan utils.GroupMessage, 20),
+	}
+
+	// test 719594145
+	// work 770539963
+	sigmaBroadcast := handle.NewSigmaBroadcast("770539963")
+	sancppBroadcast := handle.NewSancppBroadcast("770539963")
+	lifehappyBroadcast := handle.NewLifehappyBroadcast("770539963")
+	process.Broadcasts = append(process.Broadcasts, &sigmaBroadcast)
+	process.Broadcasts = append(process.Broadcasts, &sancppBroadcast)
+	process.Broadcasts = append(process.Broadcasts, &lifehappyBroadcast)
+
+	Start()
 }
